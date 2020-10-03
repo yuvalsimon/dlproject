@@ -4,7 +4,8 @@ import torch.nn.functional as F
 import torch
 import sklearn
 import sklearn.cluster
-    
+from math import ceil
+
 def cluster(data, k, temp, num_iter, init = None, cluster_temp=5):
     '''
     pytorch (differentiable) implementation of soft k-means clustering.
@@ -76,21 +77,21 @@ class Classifier(nn.Module):
         norm_eps = 0.001
         negative_slope = 0.1
         modules = [
-            nn.Conv2d(in_channels, 128, kernel_size=5, stride=2, padding=2),
+            nn.Conv2d(in_channels, 128, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(128, norm_eps),
             nn.LeakyReLU(negative_slope),
             nn.Dropout(dropout),
-            nn.Conv2d(128, out_channels, kernel_size=5, stride=2, padding=2),
+            nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(256, norm_eps),
+            nn.LeakyReLU(negative_slope),
+            nn.Dropout(dropout),
+            nn.Conv2d(256, out_channels, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(out_channels, norm_eps),
             nn.LeakyReLU(negative_slope),
             nn.Dropout(dropout),
-#             nn.Conv2d(256, out_channels, kernel_size=5, stride=2, padding=2),
-#             nn.BatchNorm2d(out_channels, norm_eps),
-#             nn.LeakyReLU(negative_slope),
-#             nn.Dropout(dropout),
         ]
         self.encoder = nn.Sequential(*modules)
-        self.encoder_features_num = int((28 / 4) ** 2 * out_channels)
+        self.encoder_features_num = int(ceil(28 / 8) ** 2 * out_channels)
         self.K = K
         self.cluster_temp = cluster_temp
         self.init =  torch.rand(self.K, self.encoder_features_num)
