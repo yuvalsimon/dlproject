@@ -1,6 +1,5 @@
 import torch.nn as nn
 import torch.nn.functional as F
-# from pygcn.layers import GraphConvolution
 import torch
 import sklearn
 import sklearn.cluster
@@ -40,58 +39,39 @@ def cluster(data, k, temp, num_iter, init = None, cluster_temp=5):
     r = torch.softmax(cluster_temp*dist, 1)
     return mu, r, dist
 
-# class GCNClusterNet(nn.Module):
-#     '''
-#     The ClusterNet architecture. The first step is a 2-layer GCN to generate embeddings.
-#     The output is the cluster means mu and soft assignments r, along with the 
-#     embeddings and the the node similarities (just output for debugging purposes).
-    
-#     The forward pass inputs are x, a feature matrix for the nodes, and adj, a sparse
-#     adjacency matrix. The optional parameter num_iter determines how many steps to 
-#     run the k-means updates for.
-#     '''
-#     def __init__(self, nfeat, nout, dropout, K, cluster_temp):
-#         super(GCNClusterNet, self).__init__()
-
-#         self.feature_extractor = nn.Sequential(
-#             nn.Linear(nfeat, nout),
-#             nn.ReLU(),
-#             nn.Dropout(dropout)
-#         )
-#         self.distmult = nn.Parameter(torch.rand(nout))
-#         self.sigmoid = nn.Sigmoid()
-#         self.K = K
-#         self.cluster_temp = cluster_temp
-#         self.init =  torch.rand(self.K, nout)
-        
-#     def forward(self, x, num_iter=1):
-#         embeds = self.feature_extractor(x)
-#         mu_init, _, _ = cluster(embeds, self.K, 1, num_iter, cluster_temp = self.cluster_temp, init = self.init)
-#         mu, r, dist = cluster(embeds, self.K, 1, 1, cluster_temp = self.cluster_temp, init = mu_init.detach().clone())
-#         return mu, r, dist
-
-class Classifier(nn.Module):
-    def __init__(self, in_channels, out_channels, K, cluster_temp):
+class Encoder(nn.Module):
+    def __init__(self, in_channels, out_channels, dropout=0.2, norm_eps=0.001, n_slope=0.1):
         super().__init__()
-        dropout = 0.2
-        norm_eps = 0.001
-        negative_slope = 0.1
-        modules = [
+        self.encoder = nn.Sequential(
             nn.Conv2d(in_channels, 128, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(128, norm_eps),
-            nn.LeakyReLU(negative_slope),
+            nn.LeakyReLU(n_slope),
             nn.Dropout(dropout),
             nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(256, norm_eps),
-            nn.LeakyReLU(negative_slope),
+            nn.LeakyReLU(n_slope),
             nn.Dropout(dropout),
             nn.Conv2d(256, out_channels, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(out_channels, norm_eps),
-            nn.LeakyReLU(negative_slope),
+            nn.LeakyReLU(n_slope),
             nn.Dropout(dropout),
-        ]
-        self.encoder = nn.Sequential(*modules)
-        self.encoder_features_num = int(ceil(28 / 8) ** 2 * out_channels)
+        )
+        self.pool_factor = 8
+
+    def forward(self, x):
+        return self.encoder(x)
+
+class KMeansClassifier(nn.Module):
+    def __init__(self, in_dims, out_channels, K, cluster_temp):
+        super().__init__()
+        if(len(in_dims) == 2):
+            in_channels = 1
+            in_x, in_y = in_dims
+        else:
+            in_x, in_y, in_channels = in_dims
+        self.encoder = Encoder(in_channels, out_channels)
+        self.encoder_features_num = int(ceil(in_x / self.encoder.pool_factor)
+            * ceil(in_y / self.encoder.pool_factor) * out_channels)
         self.K = K
         self.cluster_temp = cluster_temp
         self.init =  torch.rand(self.K, self.encoder_features_num)
@@ -101,4 +81,27 @@ class Classifier(nn.Module):
         embeds = embeds.view(-1, self.encoder_features_num)
         mu_init, _, _ = cluster(embeds, self.K, 1, num_iter, cluster_temp = self.cluster_temp, init = self.init)
         mu, r, dist = cluster(embeds, self.K, 1, 1, cluster_temp = self.cluster_temp, init = mu_init.detach().clone())
-        return mu, r, dist
+        return r
+    
+class LinearClassifier(nn.Module):
+    def __init__(self, in_dims, out_channels, K):
+        super().__init__()
+        if(len(in_dims) == 2):
+            in_channels = 1
+            in_x, in_y = in_dims
+        else:
+            in_x, in_y, in_channels = in_dims
+        self.encoder = Encoder(in_channels, out_channels)
+        self.encoder_features_num = int(ceil(in_x / self.encoder.pool_factor)
+            * ceil(in_y / self.encoder.pool_factor) * out_channels)
+        self.classifier = nn.Sequential(
+            nn.Linear(self.encoder_features_num, 256),
+            nn.ReLU(),
+            nn.Linear(256, K),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        embeds = self.encoder(x)
+        embeds = embeds.view(-1, self.encoder_features_num)
+        return self.classifier(embeds)
