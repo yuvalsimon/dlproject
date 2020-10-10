@@ -1,4 +1,4 @@
-name: kmeans2
+name: kmeans
 channels:
   - pytorch
   - defaults
