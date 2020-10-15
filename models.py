@@ -62,7 +62,7 @@ class Encoder(nn.Module):
         return self.encoder(x)
 
 class KMeansClassifier(nn.Module):
-    def __init__(self, in_dims, out_channels, K, dropout=0.2, cluster_temp=50):
+    def __init__(self, in_dims, out_channels, K, dropout=0.3, cluster_temp=50):
         super().__init__()
         if(len(in_dims) == 2):
             in_channels = 1
@@ -84,7 +84,7 @@ class KMeansClassifier(nn.Module):
         return r
     
 class LinearClassifier(nn.Module):
-    def __init__(self, in_dims, out_channels, K, dropout=0.2):
+    def __init__(self, in_dims, out_channels, K, dropout=0.3):
         super().__init__()
         if(len(in_dims) == 2):
             in_channels = 1
