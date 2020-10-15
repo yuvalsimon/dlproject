@@ -62,14 +62,14 @@ class Encoder(nn.Module):
         return self.encoder(x)
 
 class KMeansClassifier(nn.Module):
-    def __init__(self, in_dims, out_channels, K, cluster_temp):
+    def __init__(self, in_dims, out_channels, K, dropout=0.2, cluster_temp=50):
         super().__init__()
         if(len(in_dims) == 2):
             in_channels = 1
             in_x, in_y = in_dims
         else:
             in_x, in_y, in_channels = in_dims
-        self.encoder = Encoder(in_channels, out_channels)
+        self.encoder = Encoder(in_channels, out_channels, dropout)
         self.encoder_features_num = int(ceil(in_x / self.encoder.pool_factor)
             * ceil(in_y / self.encoder.pool_factor) * out_channels)
         self.K = K
@@ -84,14 +84,14 @@ class KMeansClassifier(nn.Module):
         return r
     
 class LinearClassifier(nn.Module):
-    def __init__(self, in_dims, out_channels, K):
+    def __init__(self, in_dims, out_channels, K, dropout=0.2):
         super().__init__()
         if(len(in_dims) == 2):
             in_channels = 1
             in_x, in_y = in_dims
         else:
             in_x, in_y, in_channels = in_dims
-        self.encoder = Encoder(in_channels, out_channels)
+        self.encoder = Encoder(in_channels, out_channels, dropout)
         self.encoder_features_num = int(ceil(in_x / self.encoder.pool_factor)
             * ceil(in_y / self.encoder.pool_factor) * out_channels)
         self.classifier = nn.Sequential(
